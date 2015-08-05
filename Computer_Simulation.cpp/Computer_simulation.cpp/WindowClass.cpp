@@ -5,7 +5,7 @@
 class MainWindow{
 private:
 	HWND h_Window;
-	MSG Message;
+	MSG m_message;
 
 
 
@@ -15,14 +15,16 @@ public:
 		if (!RegisterMyClass(hInstance, ClassName))
 			throw new RegistrationFailed();
 
-		h_Window = CreateWindow(ClassName, "Simulation", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, NULL, NULL, hInstance, NULL);
+		h_Window = CreateWindow(ClassName, "Simulation", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+			CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, NULL, NULL, hInstance, NULL);
 	}
 	MainWindow(char* ClassName, HINSTANCE hInstance,HWND Parent)
 	{
 		if (!RegisterMyClass(hInstance, ClassName))
 			throw new RegistrationFailed();
 
-		h_Window = CreateWindow(ClassName, "Simulation", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, Parent, NULL, hInstance, NULL);
+		h_Window = CreateWindow(ClassName, "Simulation", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+			CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, Parent, NULL, hInstance, NULL);
 	}
 
 	int RegisterMyClass(HINSTANCE hInstance, char* className)
@@ -41,28 +43,23 @@ public:
 		return RegisterClass(&wc);
 	}
 
-	void App_Run()
+	virtual int App_Run(){};
+
+	HWND GetHWND()
 	{
-		while (GetMessage(&Message, NULL, 0, 0))
-		{
-			DispatchMessage(&Message);
-		}
+		return h_Window;
 	}
 
 	MSG GetMSG()
 	{
-		return Message;
+		return m_message;
+	}
+
+	void SetMSG(MSG Message)
+	{
+		m_message = Message;
 	}
 
 	///callback funkcija za message
-	static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
-	{
-		switch (message)
-		{
-		case WM_DESTROY:
-			PostQuitMessage(0);
-			return 0;
-		}
-		return DefWindowProc(hwnd, message, wParam, lParam);
-	};
+	static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
 };

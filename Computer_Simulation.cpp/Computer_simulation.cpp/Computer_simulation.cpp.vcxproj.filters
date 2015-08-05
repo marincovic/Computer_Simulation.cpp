@@ -24,6 +24,12 @@
     <ClCompile Include="ErrorClass.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="D3Class.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="TimerClass.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ErrorClassDefinitions.h">
