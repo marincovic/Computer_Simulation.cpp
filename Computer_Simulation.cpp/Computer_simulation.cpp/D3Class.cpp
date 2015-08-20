@@ -2,30 +2,32 @@
 #include<windowsx.h>
 #include<iostream>
 #include<assert.h>
+#include"d3dUtil.h"
 
 #include<d3d11.h>
-
 #include<d3d9.h>
-#include<d3d11.h>
 #include<dxgi.h>
 
 
-#include"WindowClass.cpp"
 #include"TimerClass.cpp"
+#include"ErrorClass.cpp"
 
 
 /*
 	Vecina komentara sam prepisao iz knjige kako bi se kasnije lakse snasao
 */
 
-class D3DClass : public MainWindow
+class D3DClass
 {
-private:
+	HWND h_Window;
+	MSG m_message;
+	HRESULT hr;
+	ULONG err_code;
 
 	Time m_timer;
 
 	UINT m_4MsaaQuality;
-	LPRECT m_windowsCoordinates;
+	WINDOWINFO m_windowsInfo;
 	UINT createDeviceFlags = 0;
 
 	D3D_FEATURE_LEVEL featureLevel;
@@ -46,9 +48,14 @@ private:
 
 
 public:
-	D3DClass(char* ClassName, HINSTANCE hInstance) : MainWindow(ClassName, hInstance), m_timer(Time())
+	D3DClass(char* ClassName, HINSTANCE hInstance) : m_timer(Time())
 	{
-		
+		if (!RegisterMyClass(hInstance, ClassName))
+			throw new RegistrationFailed();
+
+		h_Window = CreateWindow(ClassName, "Simulation", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+			CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, NULL, NULL, hInstance, NULL);
+
 		// Para 4.2.1 Creating  the device and context
 		HRESULT D3D11Device = D3D11CreateDevice(
 			0, //default adapter
@@ -68,20 +75,24 @@ public:
 		assert(m_4MsaaQuality > 0);
 
 
-		if(!GetWindowRect(GetHWND(), m_windowsCoordinates))//Function used to get the coordinates of the window used to calculate width and height
-			MessageBox(GetHWND(),("GetWindowREct function failed"),("error"),1);
+		if (!GetWindowInfo(GetHWND(), &m_windowsInfo))//Function used to get the coordinates of the window used to calculate width and height
+		{
+			MessageBox(GetHWND(), ("GetWindowRect function failed"), ("error"), 1);
+		}
+		UINT window_width = m_windowsInfo.rcWindow.right - m_windowsInfo.rcWindow.left;
+		UINT window_height = m_windowsInfo.rcWindow.bottom - m_windowsInfo.rcWindow.top;
 
 		// Para 4.2.3 Desc the Swap Chain
-		m_swapChainDesc.BufferDesc.Width = m_windowsCoordinates->right - m_windowsCoordinates->left;
-		m_swapChainDesc.BufferDesc.Height = m_windowsCoordinates->bottom - m_windowsCoordinates->top;
+		m_swapChainDesc.BufferDesc.Width = window_width;
+		m_swapChainDesc.BufferDesc.Height = window_height;
 		m_swapChainDesc.BufferDesc.RefreshRate.Numerator = 60;
 		m_swapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
 		m_swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UINT;
 		m_swapChainDesc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
 		m_swapChainDesc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
 
-		m_swapChainDesc.SampleDesc.Count = 4;
-		m_swapChainDesc.SampleDesc.Quality = m_4MsaaQuality - 1;
+		m_swapChainDesc.SampleDesc.Count = 1;
+		m_swapChainDesc.SampleDesc.Quality = 0;
 
 		m_swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 		m_swapChainDesc.BufferCount = 1;
@@ -90,23 +101,25 @@ public:
 		m_swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
 		m_swapChainDesc.Flags = 0;
 
-		m_d3dDevice->QueryInterface(_uuidof(IDXGIDevice), (void**)&m_dxgiDevice);
-		m_dxgiDevice->GetParent(_uuidof(IDXGIAdapter), (void**)&m_dxgiAdapter);
-		m_dxgiAdapter->GetParent(_uuidof(IDXGIFactory), (void**)&m_dxgiFactory);
-		m_dxgiFactory->CreateSwapChain(m_d3dDevice, &m_swapChainDesc, &m_swapChain);
-
+		if (FAILED(hr = m_d3dDevice->QueryInterface(__uuidof(IDXGIDevice), (void**)&m_dxgiDevice)));
+		if (FAILED(hr = m_dxgiDevice->GetParent(__uuidof(IDXGIAdapter), (void**)&m_dxgiAdapter)));
+		if (FAILED(hr = m_dxgiAdapter->GetParent(__uuidof(IDXGIFactory), (void**)&m_dxgiFactory)));
+		if (FAILED(hr = m_dxgiFactory->CreateSwapChain(m_d3dDevice, &m_swapChainDesc, &m_swapChain)))
+		{
+			err_code=HRESULT_CODE(hr);
+		}
 		
 		m_dxgiDevice->Release();
 		m_dxgiAdapter->Release();
 		m_dxgiFactory->Release();
 		
 
-		m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&m_backBuffer));
-		m_d3dDevice->CreateRenderTargetView(m_backBuffer, 0, &m_renderTargetView);
+		HR(m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&m_backBuffer)));
+		HR(m_d3dDevice->CreateRenderTargetView(m_backBuffer, 0, &m_renderTargetView));
 		m_backBuffer->Release();
 
-		m_depthStencilDesc.Width = m_windowsCoordinates->right - m_windowsCoordinates->left;
-		m_depthStencilDesc.Height = m_windowsCoordinates->bottom - m_windowsCoordinates->top;
+		m_depthStencilDesc.Width = window_width;
+		m_depthStencilDesc.Height = window_height;
 		m_depthStencilDesc.MipLevels = 1;
 		m_depthStencilDesc.ArraySize = 1;
 		m_depthStencilDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
@@ -134,8 +147,8 @@ public:
 
 		m_viewPort.TopLeftX = 0.0f;
 		m_viewPort.TopLeftY = 0.0f;
-		m_viewPort.Width = static_cast<float> (m_windowsCoordinates->right - m_windowsCoordinates->left);
-		m_viewPort.Height = static_cast<float> (m_windowsCoordinates->bottom - m_windowsCoordinates->top);
+		m_viewPort.Width = static_cast<float> (window_width);
+		m_viewPort.Height = static_cast<float> (window_height);
 		m_viewPort.MinDepth = 0.0f;
 		m_viewPort.MaxDepth = 1.0f;
 
@@ -171,7 +184,7 @@ public:
 
 	int App_Run()
 	{
-		MainWindow::SetMSG({ 0 });
+		SetMSG({ 0 });
 
 		m_timer.Reset();
 
@@ -189,8 +202,8 @@ public:
 				if (!AppPaused())
 				{
 					CalculateFrameStats();
-					/*UpdateScene(m_timer.DeltaTimer());
-					DrawScene();*/
+					UpdateScene(m_timer.DeltaTimer());
+					DrawScene();
 				}
 				else
 					Sleep(100);
@@ -199,6 +212,58 @@ public:
 		return (int)GetMSG().wParam;
 	}
 
+	void UpdateScene(float dt)
+	{
+
+	};
+
+	void DrawScene()
+	{
+		m_d3dImmediateContext->ClearRenderTargetView(m_renderTargetView, reinterpret_cast<const float*> D3DCOLOR_ARGB(255, 0, 0, 255));
+		m_d3dImmediateContext->ClearDepthStencilView(m_depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+		m_swapChain->Present(0, 0);
+	}
+
+	int RegisterMyClass(HINSTANCE hInstance, char* className)
+	{
+		WNDCLASS wc;
+		ZeroMemory(&wc, sizeof wc);
+
+		wc.lpfnWndProc = WndProc;
+		wc.hInstance = hInstance;
+		wc.lpszClassName = className;
+
+		wc.style = CS_HREDRAW | CS_VREDRAW;
+		wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+		wc.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
+
+		return RegisterClass(&wc);
+	}
+
+	HWND GetHWND()
+	{
+		return h_Window;
+	}
+
+	MSG GetMSG()
+	{
+		return m_message;
+	}
+
+	void SetMSG(MSG Message)
+	{
+		m_message = Message;
+	}
+	
+	void CheckHRESULT(HRESULT res)
+	{
+		if (!SUCCEEDED(res))
+		{
+			
+		}
+	}
+
+	///callback funkcija za message
 	static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
 		switch (message)
@@ -208,5 +273,6 @@ public:
 			return 0;
 		}
 		return DefWindowProc(hwnd, message, wParam, lParam);
-	};
+	}
+
 };

@@ -1,12 +1,12 @@
 #include<Windows.h>
-#include"WindowClass.cpp"
+#include"D3Class.cpp"
 
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hp, LPSTR cmdLine, int nShow)
 {
-	MainWindow main = MainWindow("simulation",hInstance);
+	D3DClass main = D3DClass("simulation",hInstance);
 
 	main.App_Run();
 
-	return main.GetMSG().wParam;
+	return (int)main.GetMSG().wParam;
 }
