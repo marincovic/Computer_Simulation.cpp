@@ -17,7 +17,6 @@
     <ClCompile Include="TimerClass.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="d3dUtil.h" />
     <ClInclude Include="ErrorClassDefinitions.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

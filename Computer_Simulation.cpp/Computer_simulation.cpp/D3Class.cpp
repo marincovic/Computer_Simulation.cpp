@@ -2,7 +2,6 @@
 #include<windowsx.h>
 #include<iostream>
 #include<assert.h>
-#include"d3dUtil.h"
 
 #include<d3d11.h>
 #include<d3d9.h>
@@ -11,6 +10,8 @@
 
 #include"TimerClass.cpp"
 #include"ErrorClass.cpp"
+
+
 
 
 /*
@@ -34,9 +35,7 @@ class D3DClass
 	DXGI_SWAP_CHAIN_DESC m_swapChainDesc;
 	D3D11_TEXTURE2D_DESC m_depthStencilDesc;
 
-	IDXGIDevice* m_dxgiDevice = 0;
-	IDXGIAdapter* m_dxgiAdapter = 0;
-	IDXGIFactory* m_dxgiFactory = 0;
+
 	IDXGISwapChain* m_swapChain;
 	ID3D11RenderTargetView* m_renderTargetView;
 	ID3D11Texture2D* m_backBuffer;
@@ -55,21 +54,34 @@ public:
 
 		h_Window = CreateWindow(ClassName, "Simulation", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
 			CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, NULL, NULL, hInstance, NULL);
-
+#ifdef DEBUG || _DEBUG
+		createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
 		// Para 4.2.1 Creating  the device and context
 		HRESULT D3D11Device = D3D11CreateDevice(
-			0, //default adapter
+			NULL, //default adapter
 			D3D_DRIVER_TYPE_HARDWARE,
-			0, //software device we always specify null because we are using hardware for rendering.
+			NULL, //software device we always specify null because we are using hardware for rendering.
 			createDeviceFlags, //Optional device creatin flags 
-			0, //array for feature level support
-			0, // array for feature level support
+			NULL, //array for feature level support
+			NULL, // array for feature level support
 			D3D11_SDK_VERSION,
 			&m_d3dDevice, //Returns the created device
 			&featureLevel, //returns the first supported feature level 
 			&m_d3dImmediateContext //Returns the created devise context
 			);
+			
+		if (FAILED(D3D11Device))
+		{
+			err_code = HRESULT_CODE(D3D11Device);
+		}
 
+		if (featureLevel != D3D_FEATURE_LEVEL_11_0)
+		{
+			MessageBox(0, "Not supporting DirectX 11 feature Level", 0, 0);
+		}
+
+		
 		//Checking if hardware supports 4x MSAA
 		m_d3dDevice->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, 4, &m_4MsaaQuality);
 		assert(m_4MsaaQuality > 0);
@@ -83,11 +95,12 @@ public:
 		UINT window_height = m_windowsInfo.rcWindow.bottom - m_windowsInfo.rcWindow.top;
 
 		// Para 4.2.3 Desc the Swap Chain
+		ZeroMemory(&m_swapChainDesc, sizeof(m_swapChainDesc));
 		m_swapChainDesc.BufferDesc.Width = window_width;
 		m_swapChainDesc.BufferDesc.Height = window_height;
 		m_swapChainDesc.BufferDesc.RefreshRate.Numerator = 60;
 		m_swapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
-		m_swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UINT;
+		m_swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		m_swapChainDesc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
 		m_swapChainDesc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
 
@@ -101,9 +114,24 @@ public:
 		m_swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
 		m_swapChainDesc.Flags = 0;
 
+		IDXGIDevice* m_dxgiDevice = 0;
 		if (FAILED(hr = m_d3dDevice->QueryInterface(__uuidof(IDXGIDevice), (void**)&m_dxgiDevice)));
-		if (FAILED(hr = m_dxgiDevice->GetParent(__uuidof(IDXGIAdapter), (void**)&m_dxgiAdapter)));
-		if (FAILED(hr = m_dxgiAdapter->GetParent(__uuidof(IDXGIFactory), (void**)&m_dxgiFactory)));
+		{
+			err_code = HRESULT_CODE(hr);
+		}
+
+		IDXGIAdapter* m_dxgiAdapter = 0;
+		if (FAILED(hr = m_dxgiDevice->GetParent(__uuidof(IDXGIAdapter), (void**)&m_dxgiAdapter)))
+		{
+			err_code = HRESULT_CODE(hr);
+		}
+
+		IDXGIFactory* m_dxgiFactory = 0;
+		if (FAILED(hr = m_dxgiAdapter->GetParent(__uuidof(IDXGIFactory), (void**)&m_dxgiFactory)))
+		{
+			err_code = HRESULT_CODE(hr);
+		}
+
 		if (FAILED(hr = m_dxgiFactory->CreateSwapChain(m_d3dDevice, &m_swapChainDesc, &m_swapChain)))
 		{
 			err_code=HRESULT_CODE(hr);
@@ -114,8 +142,8 @@ public:
 		m_dxgiFactory->Release();
 		
 
-		HR(m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&m_backBuffer)));
-		HR(m_d3dDevice->CreateRenderTargetView(m_backBuffer, 0, &m_renderTargetView));
+		if (FAILED(hr = m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&m_backBuffer))))	err_code = HRESULT_CODE(hr);
+		if (FAILED(hr = m_d3dDevice->CreateRenderTargetView(m_backBuffer, 0, &m_renderTargetView))) err_code = HRESULT_CODE(hr);
 		m_backBuffer->Release();
 
 		m_depthStencilDesc.Width = window_width;
@@ -136,12 +164,14 @@ public:
 			&m_depthStencilDesc, //description of textures to create
 			0,
 			&m_depthStencilBuffer); //returns pointer to depth stencil buffer
+		
 		m_d3dDevice->CreateDepthStencilView(
 			m_depthStencilBuffer, //Resurce we want to create a view to
 			0,
 			&m_depthStencilView); //return depth stencil view
-		m_d3dImmediateContext->OMSetRenderTargets
-			(1, //number of targets to bind
+		
+		m_d3dImmediateContext->OMSetRenderTargets(
+			1, //number of targets to bind
 			&m_renderTargetView, //Pointer to the first element in a array of render target view pointers to bind to the pipe line
 			m_depthStencilView); //Pointer to the depth stencil view to bind to the pipeline;
 
@@ -253,14 +283,6 @@ public:
 	void SetMSG(MSG Message)
 	{
 		m_message = Message;
-	}
-	
-	void CheckHRESULT(HRESULT res)
-	{
-		if (!SUCCEEDED(res))
-		{
-			
-		}
 	}
 
 	///callback funkcija za message
